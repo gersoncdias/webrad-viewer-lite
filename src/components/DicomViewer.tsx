@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { fullscreenViewport, resetViewport, DicomViewport } from "./DicomViewport"
 import { PatientInfo } from "./PatientInfo"
 import { SeriesList } from "./SeriesList"
@@ -19,8 +19,15 @@ export function DicomViewer() {
 
   const selectedStudy = studies[0]
 
+  useEffect(() => {
+    loadBundledDicom()
+  }, [])
+
   async function handleFiles(files: FileList | null) {
-    const fileArray = Array.from(files ?? [])
+    await loadFiles(Array.from(files ?? []))
+  }
+
+  async function loadFiles(fileArray: File[]) {
     if (!fileArray.length) {
       return
     }
@@ -45,6 +52,21 @@ export function DicomViewer() {
         : "Nenhuma imagem DICOM encontrada nesta pasta."
     )
     setIsLoading(false)
+  }
+
+  async function loadBundledDicom() {
+    if (!isHttpProtocol()) {
+      return
+    }
+
+    try {
+      const files = await fetchDicomDirectory("../DICOM/")
+      if (files.length) {
+        await loadFiles(files)
+      }
+    } catch (error) {
+      console.info("Carregamento automatico da pasta DICOM indisponivel", error)
+    }
   }
 
   return (
@@ -102,4 +124,54 @@ export function DicomViewer() {
       />
     </main>
   )
+}
+
+
+function isHttpProtocol() {
+  return window.location.protocol === "http:" || window.location.protocol === "https:"
+}
+
+async function fetchDicomDirectory(path: string): Promise<File[]> {
+  const entries = await listDirectory(path)
+  const files: File[] = []
+
+  for (const entry of entries) {
+    if (entry.isDirectory) {
+      files.push(...await fetchDicomDirectory(entry.href))
+      continue
+    }
+
+    const response = await fetch(entry.href)
+    if (!response.ok) {
+      continue
+    }
+    const blob = await response.blob()
+    const fileName = decodeURIComponent(entry.href.split("/").filter(Boolean).at(-1) ?? "IM000000")
+    files.push(new File([blob], fileName, { type: "application/dicom" }))
+  }
+
+  return files
+}
+
+async function listDirectory(path: string) {
+  const response = await fetch(path)
+  if (!response.ok) {
+    return []
+  }
+
+  const html = await response.text()
+  const document = new DOMParser().parseFromString(html, "text/html")
+  const base = new URL(path, window.location.href)
+
+  return Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"))
+    .map((anchor) => anchor.getAttribute("href") ?? "")
+    .filter((href) => href && href !== "../" && href !== "/")
+    .map((href) => {
+      const url = new URL(href, base)
+      return {
+        href: url.href,
+        isDirectory: url.pathname.endsWith("/"),
+      }
+    })
+    .filter((entry) => entry.href.startsWith(base.href))
 }
