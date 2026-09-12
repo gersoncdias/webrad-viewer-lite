@@ -30,6 +30,7 @@ import { viteCommonjs } from "@originjs/vite-plugin-commonjs"
  * ```
  */
 export default defineConfig({
+  base: "./",
   plugins: [
     react(),
     // for dicom-parser, without rewriting Cornerstone bundled codecs
