@@ -111,6 +111,50 @@ button:disabled {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
   min-height: 0;
+  position: relative;
+}
+
+.loading-overlay {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  z-index: 20;
+}
+
+.loading-card {
+  align-items: center;
+  background: #171b22;
+  border: 1px solid #3b424c;
+  border-radius: 6px;
+  color: #f4f6f8;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  min-width: 240px;
+  padding: 22px 26px;
+}
+
+.loading-card span {
+  color: #bec7d2;
+  font-size: 13px;
+}
+
+.loading-spinner {
+  animation: spin 0.9s linear infinite;
+  border: 3px solid #3b424c;
+  border-top-color: #80cef0;
+  border-radius: 999px;
+  height: 34px;
+  width: 34px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .series-panel {

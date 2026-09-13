@@ -95,6 +95,19 @@ export function DicomViewer() {
       )}
 
       <section className="viewer-layout">
+        {isLoading && (
+          <div className="loading-overlay">
+            <div className="loading-card">
+              <div className="loading-spinner" />
+              <strong>Carregando exame</strong>
+              <span>
+                {progress?.total
+                  ? `${progress.analyzed} de ${progress.total} arquivos analisados`
+                  : "Localizando imagens DICOM..."}
+              </span>
+            </div>
+          </div>
+        )}
         <SeriesList
           onSelectSeries={setSelectedSeries}
           selectedSeriesUID={selectedSeries?.seriesInstanceUID}

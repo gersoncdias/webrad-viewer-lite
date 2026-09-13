@@ -23,15 +23,16 @@ export function groupStudies(instances: ParsedDicomInstance[]): DicomStudy[] {
       studyMap.set(instance.studyInstanceUID, study)
     }
 
+    const seriesUID = getSeriesKey(instance)
     let series = study.series.find(
-      (item) => item.seriesInstanceUID === instance.seriesInstanceUID
+      (item) => item.seriesInstanceUID === seriesUID
     )
 
     if (!series) {
       series = {
-        seriesInstanceUID: instance.seriesInstanceUID,
+        seriesInstanceUID: seriesUID,
         seriesNumber: instance.seriesNumber,
-        seriesDescription: instance.seriesDescription,
+        seriesDescription: getSeriesDescription(instance),
         modality: instance.modality,
         instances: [],
       }
@@ -69,11 +70,7 @@ export function groupStudies(instances: ParsedDicomInstance[]): DicomStudy[] {
   for (const study of studies) {
     study.series.sort(compareSeries)
     for (const series of study.series) {
-      series.instances.sort((left, right) => {
-        const leftInstance = left.instanceNumber ?? Number.MAX_SAFE_INTEGER
-        const rightInstance = right.instanceNumber ?? Number.MAX_SAFE_INTEGER
-        return leftInstance - rightInstance || left.imageId.localeCompare(right.imageId)
-      })
+      series.instances.sort(compareInstances)
     }
   }
 
@@ -84,4 +81,52 @@ function compareSeries(left: DicomSeries, right: DicomSeries) {
   const leftNumber = left.seriesNumber ?? Number.MAX_SAFE_INTEGER
   const rightNumber = right.seriesNumber ?? Number.MAX_SAFE_INTEGER
   return leftNumber - rightNumber || left.seriesInstanceUID.localeCompare(right.seriesInstanceUID)
+}
+
+
+function getSeriesKey(instance: ParsedDicomInstance) {
+  return `${instance.seriesInstanceUID}|${orientationKey(instance.imageOrientationPatient)}`
+}
+
+function getSeriesDescription(instance: ParsedDicomInstance) {
+  const description = instance.seriesDescription
+  const orientation = orientationKey(instance.imageOrientationPatient)
+  return orientation === "sem-orientacao" ? description : description
+}
+
+function orientationKey(orientation?: number[]) {
+  if (!orientation || orientation.length < 6) {
+    return "sem-orientacao"
+  }
+
+  return orientation.slice(0, 6).map((value) => value.toFixed(4)).join("|")
+}
+
+function compareInstances(left: DicomSeries["instances"][number], right: DicomSeries["instances"][number]) {
+  const leftPosition = getSlicePosition(left.imageOrientationPatient, left.imagePositionPatient)
+  const rightPosition = getSlicePosition(right.imageOrientationPatient, right.imagePositionPatient)
+
+  if (leftPosition !== undefined && rightPosition !== undefined && leftPosition !== rightPosition) {
+    return leftPosition - rightPosition
+  }
+
+  const leftInstance = left.instanceNumber ?? Number.MAX_SAFE_INTEGER
+  const rightInstance = right.instanceNumber ?? Number.MAX_SAFE_INTEGER
+  return leftInstance - rightInstance || left.imageId.localeCompare(right.imageId)
+}
+
+function getSlicePosition(orientation?: number[], position?: number[]) {
+  if (!orientation || orientation.length < 6 || !position || position.length < 3) {
+    return undefined
+  }
+
+  const row = orientation.slice(0, 3)
+  const column = orientation.slice(3, 6)
+  const normal = [
+    row[1] * column[2] - row[2] * column[1],
+    row[2] * column[0] - row[0] * column[2],
+    row[0] * column[1] - row[1] * column[0],
+  ]
+
+  return normal[0] * position[0] + normal[1] * position[1] + normal[2] * position[2]
 }
